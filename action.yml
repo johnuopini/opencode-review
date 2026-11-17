@@ -1,0 +1,156 @@
+name: OpenCode PR Review
+description: Advisory, read-only pull request review (security or code) with OpenCode on an OpenAI-compatible endpoint.
+
+inputs:
+  check:
+    description: Review to run, `security` or `code`.
+    required: true
+  base-url:
+    description: OpenAI-compatible API base URL, for example `https://llm.example.com/v1`.
+    required: true
+  model:
+    description: Model id at that endpoint.
+    required: true
+  small-model:
+    description: Model id for small tasks such as titles. Defaults to `model`.
+    required: false
+    default: ""
+  api-key:
+    description: API key for the endpoint.
+    required: true
+  github-token:
+    description: Token used to post the review comment.
+    required: false
+    default: ${{ github.token }}
+  dry-run:
+    description: "`true` runs the review without posting. The result goes to the step summary and an artifact."
+    required: false
+    default: "false"
+  opencode-version:
+    description: OpenCode release to install.
+    required: false
+    # renovate: datasource=github-releases depName=anomalyco/opencode
+    default: "1.18.32"
+
+runs:
+  using: composite
+  steps:
+    - name: Validate Inputs
+      shell: bash
+      env:
+        CHECK: ${{ inputs.check }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        VERSION: ${{ inputs.opencode-version }}
+      run: |
+        case "$CHECK" in security | code) ;; *) echo "::error::check must be security or code, got '$CHECK'"; exit 1 ;; esac
+        case "$DRY_RUN" in true | false) ;; *) echo "::error::dry-run must be true or false, got '$DRY_RUN'"; exit 1 ;; esac
+        [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::opencode-version must be X.Y.Z, got '$VERSION'"; exit 1; }
+
+    - name: Install OpenCode
+      shell: bash
+      env:
+        VERSION: ${{ inputs.opencode-version }}
+      run: |
+        case "$RUNNER_ARCH" in X64) arch=x64 ;; ARM64) arch=arm64 ;; *) echo "::error::unsupported runner arch $RUNNER_ARCH"; exit 1 ;; esac
+        dir="$RUNNER_TEMP/opencode/bin"
+        mkdir -p "$dir"
+        curl -fsSL --retry 3 "https://github.com/anomalyco/opencode/releases/download/v$VERSION/opencode-linux-$arch.tar.gz" |
+          tar -xz -C "$dir" opencode
+        echo "$dir" >> "$GITHUB_PATH"
+        "$dir/opencode" --version
+
+    - name: Prepare Review
+      id: prepare
+      shell: bash
+      env:
+        CHECK: ${{ inputs.check }}
+      run: |
+        # opencode runs git later, possibly as another user than checkout
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        head=$(git rev-parse HEAD)
+        # On pull_request, HEAD is the merge commit and its first parent the base.
+        # Computed now: `opencode github run` checks out the PR branch later.
+        base=$(git rev-parse --verify --quiet HEAD^1) ||
+          { echo "::error::HEAD has no parent; check out with fetch-depth: 2"; exit 1; }
+        if [ "$CHECK" = security ]; then section="Security review"; else section="Code review"; fi
+        {
+          echo "short=${head:0:12}"
+          echo "prompt<<PROMPT_EOF"
+          echo "Run the $CHECK review of the change \`git diff $base $head\`."
+          echo "First read the \"$section\" section of AGENTS.md at the repository root, or of CLAUDE.md if there is no AGENTS.md, and apply it."
+          echo "PROMPT_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    # `debug agent` shows the effective permissions and prompt. Never log
+    # `debug config`: it contains the resolved API key.
+    - name: Show Effective Agent
+      shell: bash
+      env:
+        CHECK: ${{ inputs.check }}
+        OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
+        OPENCODE_DISABLE_PROJECT_CONFIG: "true"
+        OPENCODE_DISABLE_AUTOUPDATE: "true"
+        OPENCODE_DISABLE_CLAUDE_CODE: "true"
+        XDG_CONFIG_HOME: ${{ runner.temp }}/opencode/config
+        REVIEW_BASE_URL: ${{ inputs.base-url }}
+        REVIEW_MODEL: ${{ inputs.model }}
+        REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
+      run: opencode debug agent "$CHECK"
+
+    - name: Review
+      if: inputs.dry-run != 'true'
+      shell: bash
+      env:
+        OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
+        OPENCODE_DISABLE_PROJECT_CONFIG: "true"
+        OPENCODE_DISABLE_AUTOUPDATE: "true"
+        OPENCODE_DISABLE_CLAUDE_CODE: "true"
+        XDG_CONFIG_HOME: ${{ runner.temp }}/opencode/config
+        REVIEW_BASE_URL: ${{ inputs.base-url }}
+        REVIEW_API_KEY: ${{ inputs.api-key }}
+        REVIEW_MODEL: ${{ inputs.model }}
+        REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
+        MODEL: review/${{ inputs.model }}
+        AGENT: ${{ inputs.check }}
+        SHARE: "false"
+        USE_GITHUB_TOKEN: "true"
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PROMPT: ${{ steps.prepare.outputs.prompt }}
+      run: opencode github run
+
+    - name: Dry Run
+      if: inputs.dry-run == 'true'
+      shell: bash
+      env:
+        CHECK: ${{ inputs.check }}
+        OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
+        OPENCODE_DISABLE_PROJECT_CONFIG: "true"
+        OPENCODE_DISABLE_AUTOUPDATE: "true"
+        OPENCODE_DISABLE_CLAUDE_CODE: "true"
+        XDG_CONFIG_HOME: ${{ runner.temp }}/opencode/config
+        REVIEW_BASE_URL: ${{ inputs.base-url }}
+        REVIEW_API_KEY: ${{ inputs.api-key }}
+        REVIEW_MODEL: ${{ inputs.model }}
+        REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
+        PROMPT: ${{ steps.prepare.outputs.prompt }}
+      run: |
+        out="$RUNNER_TEMP/opencode-review"
+        mkdir -p "$out"
+        start=$(date +%s)
+        status=0
+        opencode run --agent "$CHECK" --model "review/$REVIEW_MODEL" "$PROMPT" > "$out/review.md" || status=$?
+        printf 'exit=%s\nseconds=%s\n' "$status" "$(( $(date +%s) - start ))" > "$out/meta.txt"
+        {
+          echo "## $CHECK review (dry run)"
+          echo
+          cat "$out/review.md"
+        } >> "$GITHUB_STEP_SUMMARY"
+        exit "$status"
+
+    - name: Upload Dry Run
+      if: always() && inputs.dry-run == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: review-${{ inputs.check }}-${{ steps.prepare.outputs.short }}
+        path: ${{ runner.temp }}/opencode-review/
+        if-no-files-found: warn

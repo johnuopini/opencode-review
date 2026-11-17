@@ -41,3 +41,39 @@ jobs:
 
       - name: Test Config Lock
         run: test/config-lock.sh opencode/opencode.json
+
+  smoke:
+    name: Smoke Test Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      # No secrets here: the endpoint is unreachable, so the review must fail
+      # cleanly after install, prompt and agent setup worked.
+      - name: Run Action Against An Unreachable Endpoint
+        id: review
+        uses: ./
+        continue-on-error: true
+        timeout-minutes: 5
+        with:
+          check: security
+          base-url: https://invalid.invalid/v1
+          model: smoke-model
+          api-key: smoke-key-not-secret
+          dry-run: "true"
+
+      - name: Check Result
+        env:
+          OUTCOME: ${{ steps.review.outcome }}
+        run: |
+          test "$OUTCOME" = failure
+          test "$(opencode --version)" = "$OPENCODE_VERSION"
+          grep -Eq '^exit=[1-9]' "$RUNNER_TEMP/opencode-review/meta.txt"
+          if grep -rq smoke-key-not-secret "$RUNNER_TEMP/opencode-review"; then
+            echo "::error::API key leaked into the review output"
+            exit 1
+          fi
