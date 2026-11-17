@@ -83,10 +83,13 @@ runs:
 
     # `debug agent` shows the effective permissions and prompt. Never log
     # `debug config`: it contains the resolved API key.
+    # REVIEW_AGENT sets `default_agent` in opencode.json. That is how the
+    # check picks its agent: `opencode github run` ignores the AGENT variable.
     - name: Show Effective Agent
       shell: bash
       env:
         CHECK: ${{ inputs.check }}
+        REVIEW_AGENT: ${{ inputs.check }}
         OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
         OPENCODE_DISABLE_PROJECT_CONFIG: "true"
         OPENCODE_DISABLE_AUTOUPDATE: "true"
@@ -110,8 +113,8 @@ runs:
         REVIEW_API_KEY: ${{ inputs.api-key }}
         REVIEW_MODEL: ${{ inputs.model }}
         REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
+        REVIEW_AGENT: ${{ inputs.check }}
         MODEL: review/${{ inputs.model }}
-        AGENT: ${{ inputs.check }}
         SHARE: "false"
         USE_GITHUB_TOKEN: "true"
         GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -132,13 +135,15 @@ runs:
         REVIEW_API_KEY: ${{ inputs.api-key }}
         REVIEW_MODEL: ${{ inputs.model }}
         REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
+        REVIEW_AGENT: ${{ inputs.check }}
         PROMPT: ${{ steps.prepare.outputs.prompt }}
       run: |
         out="$RUNNER_TEMP/opencode-review"
         mkdir -p "$out"
         start=$(date +%s)
         status=0
-        opencode run --agent "$CHECK" --model "review/$REVIEW_MODEL" "$PROMPT" > "$out/review.md" || status=$?
+        # No --agent: the agent comes from default_agent, as in the live review
+        opencode run --model "review/$REVIEW_MODEL" "$PROMPT" > "$out/review.md" || status=$?
         printf 'exit=%s\nseconds=%s\n' "$status" "$(( $(date +%s) - start ))" > "$out/meta.txt"
         {
           echo "## $CHECK review (dry run)"

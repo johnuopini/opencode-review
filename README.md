@@ -5,7 +5,7 @@ Advisory pull request review with [OpenCode](https://opencode.ai) on any OpenAI-
 - `security`: reports medium or higher only. When clean it says so in one line.
 - `code`: correctness, error handling, broken callers and missing tests. No style comments.
 
-The review is read-only: no edits, and bash is limited to `git diff`, `git log` and `git show`. Config, prompts and permissions come only from this action. Project OpenCode config in the reviewed repo (a root `opencode.json`, `.opencode/`) is ignored, which `test/config-lock.sh` checks.
+Edits are denied, and bash is limited to `git diff`, `git log` and `git show`, without paths outside the repository, `--no-index`, `--output` or redirects. This stops the agent from changing the tree by mistake (`opencode github run` commits and pushes a dirty tree). It is not a sandbox: the shell environment holds the API key and the GitHub token. Config, prompts and permissions come only from this action. Project OpenCode config in the reviewed repo (a root `opencode.json`, `.opencode/`) is ignored, which `test/config-lock.sh` checks.
 
 Repo rules go in a `Security review` or `Code review` section of the repo's `AGENTS.md`, or `CLAUDE.md` when there is no `AGENTS.md`.
 

@@ -3,6 +3,7 @@
   "autoupdate": false,
   "share": "disabled",
   "enabled_providers": ["review"],
+  "default_agent": "{env:REVIEW_AGENT}",
   "small_model": "review/{env:REVIEW_SMALL_MODEL}",
   "provider": {
     "review": {
@@ -24,7 +25,16 @@
       "*": "deny",
       "git diff *": "allow",
       "git log *": "allow",
-      "git show *": "allow"
+      "git show *": "allow",
+      "*--no-index*": "deny",
+      "* /*": "deny",
+      "* '/*": "deny",
+      "* \"/*": "deny",
+      "*../*": "deny",
+      "* ~*": "deny",
+      "*$*": "deny",
+      "*--out*": "deny",
+      "*>*": "deny"
     },
     "webfetch": "deny",
     "websearch": "deny",
@@ -44,7 +54,16 @@
           "*": "deny",
           "git diff *": "allow",
           "git log *": "allow",
-          "git show *": "allow"
+          "git show *": "allow",
+          "*--no-index*": "deny",
+          "* /*": "deny",
+          "* '/*": "deny",
+          "* \"/*": "deny",
+          "*../*": "deny",
+          "* ~*": "deny",
+          "*$*": "deny",
+          "*--out*": "deny",
+          "*>*": "deny"
         },
         "webfetch": "deny",
         "websearch": "deny",
@@ -64,7 +83,16 @@
           "*": "deny",
           "git diff *": "allow",
           "git log *": "allow",
-          "git show *": "allow"
+          "git show *": "allow",
+          "*--no-index*": "deny",
+          "* /*": "deny",
+          "* '/*": "deny",
+          "* \"/*": "deny",
+          "*../*": "deny",
+          "* ~*": "deny",
+          "*$*": "deny",
+          "*--out*": "deny",
+          "*>*": "deny"
         },
         "webfetch": "deny",
         "websearch": "deny",
