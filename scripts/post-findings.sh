@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Posts the review as one PR comment when it has at least one finding line
-# (`**<severity>** ...`, optionally as a list item). A clean review, or one
-# with only notes, posts nothing: a clean PR gets no comment and no email.
+# (`**<severity>** ...`). A clean review, or one with only notes, posts
+# nothing: a clean PR gets no comment and no email. The match also takes the
+# small slips a model makes (a list item, `1.`, `**High:**`), so a real finding
+# is never dropped for its format.
 #
 # Usage: scripts/post-findings.sh <review.md>
 # Env: CHECK, PR_NUMBER, GITHUB_TOKEN and the default GITHUB_* variables.
 set -euo pipefail
 
 review=$1
-finding='^[[:space:]]*([-*][[:space:]]+)?\*\*(critical|high|medium|low)\*\*'
+finding='^[[:space:]]*([-*+][[:space:]]+|[0-9]+[.)][[:space:]]+)?\*\*(critical|high|medium|low):?\*\*'
 
 if ! grep -Eiq "$finding" "$review"; then
   echo "No findings: no comment posted."

@@ -58,8 +58,21 @@ silent "clean code" 'No code review findings.\n' CHECK=code
 silent "notes only" 'I read the diff and AGENTS.md.\n\nNo security findings at medium or higher.\n'
 silent "empty reply" ''
 silent "not a severity" '**info** `a.sh:1` — not a finding\n'
+silent "not a severity, colon" '**Note:** I read the diff.\n'
 silent "no pull request" '**high** `a.sh:1` — x — y\n' PR_NUMBER=
 grep -q '::warning::' "$work/out" || fail "no pull request: no warning"
+
+posts() { # posts <name> <review text>: a finding the model wrote off format
+  local name=$1 text=$2
+  printf '%b' "$text" >"$work/review.md"
+  run "$work/review.md" || fail "$name: exit $? ($(cat "$work/out"))"
+  [ -e "$work/log/args" ] || fail "$name: no comment posted"
+}
+
+posts "numbered" '1. **high** `a.sh:1` — x — y\n'
+posts "numbered paren" '2) **medium** `a.sh:1` — x — y\n'
+posts "plus bullet" '+ **critical** `a.sh:1` — x — y\n'
+posts "colon in bold" '**High:** `a.sh:1` — x — y\n'
 
 # Findings with quote, backslash, tab, CRLF and a bell, then a bullet finding
 printf '**high** `k8s/app.yaml:12` — the "token" is printed: C:\\path\tend\r\n- **Medium** `a.sh:3` — x\a — y\n' \

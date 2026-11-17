@@ -1,6 +1,6 @@
 # opencode-review
 
-Advisory pull request review with [OpenCode](https://opencode.ai) on any OpenAI-compatible endpoint. A check comments on the PR only when it finds something, so a clean PR gets no comment and no email. Every review is in the job's step summary. A check never fails the PR.
+Advisory pull request review with [OpenCode](https://opencode.ai) on any OpenAI-compatible endpoint. A check comments on the PR only when it finds something, so a clean PR gets no comment and no email. Every review is in the job's step summary. A failed review (endpoint down, bad key) posts nothing either: it shows as a failed step and an annotation on the run. A check never fails the PR.
 
 - `security`: reports medium or higher only.
 - `code`: correctness, error handling, broken callers and missing tests. No style comments.
