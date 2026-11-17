@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # renovate: datasource=github-releases depName=rhysd/actionlint
+  ACTIONLINT_VERSION: "1.7.12"
+  # renovate: datasource=github-releases depName=anomalyco/opencode
+  OPENCODE_VERSION: "1.18.32"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          gh release download "v$ACTIONLINT_VERSION" --repo rhysd/actionlint \
+            --pattern "actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" --output - \
+            | tar -xz -C "$RUNNER_TEMP/bin" actionlint
+          gh release download "v$OPENCODE_VERSION" --repo anomalyco/opencode \
+            --pattern opencode-linux-x64.tar.gz --output - \
+            | tar -xz -C "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Lint Workflows
+        run: actionlint
+
+      - name: Test Config Lock
+        run: test/config-lock.sh opencode/opencode.json

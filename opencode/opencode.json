@@ -1,0 +1,78 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "share": "disabled",
+  "enabled_providers": ["review"],
+  "small_model": "review/{env:REVIEW_SMALL_MODEL}",
+  "provider": {
+    "review": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Review",
+      "options": {
+        "baseURL": "{env:REVIEW_BASE_URL}",
+        "apiKey": "{env:REVIEW_API_KEY}"
+      },
+      "models": {
+        "{env:REVIEW_MODEL}": { "name": "Review" },
+        "{env:REVIEW_SMALL_MODEL}": { "name": "Review small" }
+      }
+    }
+  },
+  "permission": {
+    "edit": "deny",
+    "bash": {
+      "*": "deny",
+      "git diff *": "allow",
+      "git log *": "allow",
+      "git show *": "allow"
+    },
+    "webfetch": "deny",
+    "websearch": "deny",
+    "external_directory": "deny",
+    "question": "deny",
+    "skill": "deny",
+    "task": "deny"
+  },
+  "agent": {
+    "security": {
+      "description": "Advisory security review of a pull request",
+      "mode": "primary",
+      "prompt": "{file:./prompts/security.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff *": "allow",
+          "git log *": "allow",
+          "git show *": "allow"
+        },
+        "webfetch": "deny",
+        "websearch": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "skill": "deny",
+        "task": "deny"
+      }
+    },
+    "code": {
+      "description": "Advisory code review of a pull request",
+      "mode": "primary",
+      "prompt": "{file:./prompts/code.md}",
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git diff *": "allow",
+          "git log *": "allow",
+          "git show *": "allow"
+        },
+        "webfetch": "deny",
+        "websearch": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "skill": "deny",
+        "task": "deny"
+      }
+    }
+  }
+}
