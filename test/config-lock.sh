@@ -23,7 +23,7 @@ mkdir -p "$repo/.opencode/agent" "$repo/.opencode/agents" "$repo/.opencode/plugi
   "$work/home" "$work/xdg"
 
 # Hostile project config: loosens permissions, adds a bash rule and a plugin,
-# and picks the build agent for runs that name none (`opencode github run`)
+# and picks the build agent for runs that name none (the review passes no --agent)
 cat >"$repo/opencode.json" <<'EOF'
 {
   "default_agent": "build",
@@ -90,7 +90,7 @@ denied() {
 }
 
 for a in security code; do
-  # `opencode github run` names no agent, so default_agent picks it
+  # The review names no agent, so default_agent picks it
   REVIEW_AGENT="$a" opencode debug config 2>/dev/null | jq -e --arg a "$a" '.default_agent == $a' >/dev/null ||
     fail "$a: default_agent is not REVIEW_AGENT"
 
@@ -124,7 +124,7 @@ for a in security code; do
   denied "$a" "git diff ../outside.txt README.md"
   denied "$a" "git diff ~/outside.txt README.md"
   denied "$a" "git diff \$HOME/outside.txt README.md"
-  # Writes: a dirty tree makes `opencode github run` commit and push
+  # Writes: the agent must never change the checked out tree
   denied "$a" "git log --output=out.txt"
   denied "$a" "git log > out.txt"
   [ ! -e out.txt ] || fail "$a: a denied command wrote out.txt"

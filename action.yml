@@ -69,7 +69,6 @@ runs:
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
         head=$(git rev-parse HEAD)
         # On pull_request, HEAD is the merge commit and its first parent the base.
-        # Computed now: `opencode github run` checks out the PR branch later.
         base=$(git rev-parse --verify --quiet HEAD^1) ||
           { echo "::error::HEAD has no parent; check out with fetch-depth: 2"; exit 1; }
         if [ "$CHECK" = security ]; then section="Security review"; else section="Code review"; fi
@@ -84,7 +83,7 @@ runs:
     # `debug agent` shows the effective permissions and prompt. Never log
     # `debug config`: it contains the resolved API key.
     # REVIEW_AGENT sets `default_agent` in opencode.json. That is how the
-    # check picks its agent: `opencode github run` ignores the AGENT variable.
+    # check picks its agent: the review passes no --agent.
     - name: Show Effective Agent
       shell: bash
       env:
@@ -100,32 +99,13 @@ runs:
         REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
       run: opencode debug agent "$CHECK"
 
+    # Live and dry runs review the same way. The reply goes to the step
+    # summary; Post Findings decides whether it also becomes a comment.
     - name: Review
-      if: inputs.dry-run != 'true'
-      shell: bash
-      env:
-        OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
-        OPENCODE_DISABLE_PROJECT_CONFIG: "true"
-        OPENCODE_DISABLE_AUTOUPDATE: "true"
-        OPENCODE_DISABLE_CLAUDE_CODE: "true"
-        XDG_CONFIG_HOME: ${{ runner.temp }}/opencode/config
-        REVIEW_BASE_URL: ${{ inputs.base-url }}
-        REVIEW_API_KEY: ${{ inputs.api-key }}
-        REVIEW_MODEL: ${{ inputs.model }}
-        REVIEW_SMALL_MODEL: ${{ inputs.small-model || inputs.model }}
-        REVIEW_AGENT: ${{ inputs.check }}
-        MODEL: review/${{ inputs.model }}
-        SHARE: "false"
-        USE_GITHUB_TOKEN: "true"
-        GITHUB_TOKEN: ${{ inputs.github-token }}
-        PROMPT: ${{ steps.prepare.outputs.prompt }}
-      run: opencode github run
-
-    - name: Dry Run
-      if: inputs.dry-run == 'true'
       shell: bash
       env:
         CHECK: ${{ inputs.check }}
+        DRY_RUN: ${{ inputs.dry-run }}
         OPENCODE_CONFIG: ${{ github.action_path }}/opencode/opencode.json
         OPENCODE_DISABLE_PROJECT_CONFIG: "true"
         OPENCODE_DISABLE_AUTOUPDATE: "true"
@@ -142,15 +122,26 @@ runs:
         mkdir -p "$out"
         start=$(date +%s)
         status=0
-        # No --agent: the agent comes from default_agent, as in the live review
+        # No --agent: the agent comes from default_agent
         opencode run --model "review/$REVIEW_MODEL" "$PROMPT" > "$out/review.md" || status=$?
         printf 'exit=%s\nseconds=%s\n' "$status" "$(( $(date +%s) - start ))" > "$out/meta.txt"
         {
-          echo "## $CHECK review (dry run)"
+          if [ "$DRY_RUN" = true ]; then echo "## $CHECK review (dry run)"; else echo "## $CHECK review"; fi
           echo
           cat "$out/review.md"
         } >> "$GITHUB_STEP_SUMMARY"
         exit "$status"
+
+    # Only a review with findings becomes a comment, so a clean PR stays quiet.
+    # A failed review stops the action before this step and posts nothing.
+    - name: Post Findings
+      if: inputs.dry-run != 'true'
+      shell: bash
+      env:
+        CHECK: ${{ inputs.check }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/post-findings.sh" "$RUNNER_TEMP/opencode-review/review.md"'
 
     - name: Upload Dry Run
       if: always() && inputs.dry-run == 'true'

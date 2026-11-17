@@ -39,8 +39,14 @@ jobs:
       - name: Lint Workflows
         run: actionlint
 
+      - name: Lint Scripts
+        run: shellcheck scripts/*.sh test/*.sh
+
       - name: Test Config Lock
         run: test/config-lock.sh opencode/opencode.json
+
+      - name: Test Post Findings
+        run: test/post-findings.sh
 
   smoke:
     name: Smoke Test Action
