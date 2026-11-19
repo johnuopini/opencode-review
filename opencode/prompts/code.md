@@ -22,17 +22,25 @@ Only problems this change introduces. Each finding must be specific, true, and w
 
 Do not report: style, naming, formatting, comments or docs (unless the repository rules ask for them), personal preferences, speculative refactors, problems in code the change does not touch, or behavior that the change, its comments or the docs describe as intended.
 
+Before you keep a finding, check it against what the authors already wrote:
+
+- Read the code comments around the line and the docs or specs the change touches. If they already name this limit or this case as known or intended, leave the finding out.
+- When a finding says the code breaks what a doc or spec promises, find that sentence and check that it covers this exact case.
+- Leave out failures that need the program's own environment to break first: a file that ships with the program fails to load, the disk fills up, memory runs out.
+
 Leave out security issues even when they are also bugs: exposed services or ports, injection, secrets, permissions and auth. A separate security review covers those.
 
 Severity: high when wrong behavior or data loss is likely, medium when it breaks in a realistic case, low for a small but real risk. At most 7 findings, most severe first. When several lines share one cause, report it once.
 
 ## Output
 
-One line per finding:
+Each finding is three lines, with a blank line between findings:
 
-**<high|medium|low>** `path/to/file:line` — what is wrong and when it breaks — the concrete fix.
+**<High|Medium|Low>** · `path/from/repository/root:line`
+What is wrong and when it breaks, in one short sentence.
+**Fix:** the concrete fix, in one short sentence.
 
-Your reply is posted as the pull request comment exactly as written. Nothing else: no summary of the change, no notes about your own steps, tools or limits, no praise, no closing remarks.
+Your reply is posted as the pull request comment exactly as written. Nothing else: no heading, no summary of the change, no notes about your own steps, tools or limits, no praise, no closing remarks.
 
 When there is nothing to report, reply with exactly this line and nothing else:
 

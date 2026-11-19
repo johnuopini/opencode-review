@@ -32,6 +32,9 @@ exit "${CURL_EXIT:-0}"
 EOF
 chmod +x "$work/bin/curl"
 
+sha=0123456789abcdef0123456789abcdef01234567
+blob="https://github.example.test/owner/repo/blob/$sha"
+
 # run <review file> [VAR=value ...]: runs the script, output in $work/out
 run() {
   local review=$1
@@ -41,7 +44,7 @@ run() {
   env PATH="$work/bin:$PATH" CURL_LOG="$work/log" \
     GITHUB_TOKEN=test-token-not-secret GITHUB_API_URL=https://api.example.test \
     GITHUB_SERVER_URL=https://github.example.test GITHUB_REPOSITORY=owner/repo \
-    GITHUB_RUN_ID=42 CHECK=security PR_NUMBER=7 "$@" \
+    GITHUB_RUN_ID=42 CHECK=security PR_NUMBER=7 HEAD_SHA="$sha" "$@" \
     bash "$script" "$review" >"$work/out" 2>&1
 }
 
@@ -87,13 +90,48 @@ if grep -q test-token-not-secret "$work/log/args"; then
   fail "findings: token in curl arguments"
 fi
 jq -e . "$work/log/payload" >/dev/null || fail "findings: payload is not JSON: $(cat "$work/log/payload")"
-printf '**high** `k8s/app.yaml:12` — the "token" is printed: C:\\path\tend\n- **Medium** `a.sh:3` — x — y\n\n[security review run](https://github.example.test/owner/repo/actions/runs/42)\n' \
-  >"$work/expected"
+printf '### Security review\n\n**high** [`k8s/app.yaml:12`](%s/k8s/app.yaml#L12) — the "token" is printed: C:\\path\tend\n- **Medium** [`a.sh:3`](%s/a.sh#L3) — x — y\n\n[security review run](https://github.example.test/owner/repo/actions/runs/42)\n' \
+  "$blob" "$blob" >"$work/expected"
 jq -r .body "$work/log/payload" | diff -u "$work/expected" - || fail "findings: wrong body"
 
+# The finding layout of the prompts: the location on a finding line becomes a
+# link to that line at the PR head, shown as its last two path parts. Other
+# lines and a second location stay as written.
+cat >"$work/review.md" <<'EOF'
+**Medium** · `posterior/src/main/kotlin/deeplinks/Assets.kt:40`
+A read error escapes, as in `other/File.kt:9`.
+**Fix:** catch it in `deeplinks/Assets.kt:41`.
+
+**Low** · `README.md:3-7` and `x/y.kt:1`
+
+**High** · `./k8s/app/deployment.yaml:5`
+
+**Low** · `a.sh` has no line
+EOF
+run "$work/review.md" CHECK=code || fail "layout: exit $? ($(cat "$work/out"))"
+cat >"$work/expected" <<EOF
+### Code review
+
+**Medium** · [\`deeplinks/Assets.kt:40\`]($blob/posterior/src/main/kotlin/deeplinks/Assets.kt#L40)
+A read error escapes, as in \`other/File.kt:9\`.
+**Fix:** catch it in \`deeplinks/Assets.kt:41\`.
+
+**Low** · [\`README.md:3-7\`]($blob/README.md#L3-L7) and \`x/y.kt:1\`
+
+**High** · [\`app/deployment.yaml:5\`]($blob/k8s/app/deployment.yaml#L5)
+
+**Low** · \`a.sh\` has no line
+
+[code review run](https://github.example.test/owner/repo/actions/runs/42)
+EOF
+jq -r .body "$work/log/payload" | diff -u "$work/expected" - || fail "layout: wrong body"
+
+# Without the PR head the location stays as written
 printf '**low** `b.kt:9` — x — y\n' >"$work/review.md"
-run "$work/review.md" CHECK=code || fail "code finding: exit $?"
-jq -r .body "$work/log/payload" | grep -qF '[code review run](' || fail "code finding: wrong run link"
+run "$work/review.md" HEAD_SHA= || fail "no head: exit $?"
+printf '### Security review\n\n**low** `b.kt:9` — x — y\n\n[security review run](https://github.example.test/owner/repo/actions/runs/42)\n' \
+  >"$work/expected"
+jq -r .body "$work/log/payload" | diff -u "$work/expected" - || fail "no head: wrong body"
 
 if run "$work/review.md" CURL_EXIT=22; then
   fail "curl failure: script succeeded"

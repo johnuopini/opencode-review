@@ -24,10 +24,36 @@ fi
 run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 # Control characters other than tab and newline are dropped
 text=$(LC_ALL=C tr -d '\000-\010\013-\037' <"$review")
+
+# The first `path:line` on each finding line becomes a link to that line at the
+# PR head, shown as its last two path parts, so a deep path stays short.
+# Portable awk only (mawk on Debian): no intervals, no gawk match arrays.
+if [[ "${HEAD_SHA:-}" =~ ^[0-9a-f]+$ ]]; then
+  text=$(
+    printf '%s\n' "$text" |
+      LC_ALL=C awk -v blob="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$HEAD_SHA" '
+        tolower($0) ~ /^[ \t]*([-*+][ \t]+|[0-9]+[.)][ \t]+)?\*\*(critical|high|medium|low):?\*\*/ &&
+        match($0, /`[A-Za-z0-9._\/@+-]+:[0-9]+(-[0-9]+)?`/) {
+          loc = substr($0, RSTART + 1, RLENGTH - 2)
+          colon = index(loc, ":")
+          path = substr(loc, 1, colon - 1)
+          lines = substr(loc, colon + 1)
+          sub(/^(\.\/|\/)+/, "", path)
+          anchor = "#L" lines
+          sub(/-/, "-L", anchor)
+          n = split(path, part, "/")
+          short = n > 1 ? part[n - 1] "/" part[n] : path
+          $0 = substr($0, 1, RSTART - 1) "[`" short ":" lines "`](" blob "/" path anchor ")" substr($0, RSTART + RLENGTH)
+        }
+        { print }'
+  )
+fi
+check_title="$(printf '%s' "${CHECK:0:1}" | tr '[:lower:]' '[:upper:]')${CHECK:1} review"
+
 # JSON string by hand, so the job needs no jq: escape backslash, quote and
 # tab, then join the lines with \n
 body=$(
-  printf '%s\n\n[%s review run](%s)\n' "$text" "$CHECK" "$run_url" |
+  printf '### %s\n\n%s\n\n[%s review run](%s)\n' "$check_title" "$text" "$CHECK" "$run_url" |
     LC_ALL=C sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e "s/$(printf '\t')/\\\\t/g" |
     LC_ALL=C awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }'
 )

@@ -5,6 +5,8 @@ Advisory pull request review with [OpenCode](https://opencode.ai) on any OpenAI-
 - `security`: reports medium or higher only.
 - `code`: correctness, error handling, broken callers and missing tests. No style comments.
 
+The comment has a heading for the check, then three lines per finding: severity and location, the problem, the fix. The location links to that line at the PR head.
+
 Edits are denied, and bash is limited to `git diff`, `git log` and `git show`, without paths outside the repository, `--no-index`, `--output` or redirects. This stops the agent from changing the tree by mistake. It is not a sandbox: the shell environment holds the API key. The GitHub token only reaches the step that posts the comment, not the agent. Config, prompts and permissions come only from this action. Project OpenCode config in the reviewed repo (a root `opencode.json`, `.opencode/`) is ignored, which `test/config-lock.sh` checks.
 
 Repo rules go in a `Security review` or `Code review` section of the repo's `AGENTS.md`, or `CLAUDE.md` when there is no `AGENTS.md`.
@@ -50,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
-      - uses: johnuopini/opencode-review@<sha> # v1.1.0
+      - uses: johnuopini/opencode-review@<sha> # v1.2.0
         continue-on-error: true
         with:
           check: ${{ matrix.check }}

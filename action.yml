@@ -140,6 +140,8 @@ runs:
       env:
         CHECK: ${{ inputs.check }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        # Locations link to the PR head, not the merge commit, which GitHub drops later
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
       run: '"$GITHUB_ACTION_PATH/scripts/post-findings.sh" "$RUNNER_TEMP/opencode-review/review.md"'
 
