@@ -24,13 +24,14 @@ Do not report: style, naming, formatting, comments or docs (unless the repositor
 
 Before you keep a finding, check it against what the authors already wrote:
 
-- Read the code comments around the line and the docs or specs the change touches. If they already name this limit or this case as known or intended, leave the finding out.
+- Read the code comments around the line and the docs or specs the change touches, including the text the change itself adds to them. If they already name this consequence or this case as known or intended, leave the finding out.
 - When a finding says the code breaks what a doc or spec promises, find that sentence and check that it covers this exact case.
+- Name the case that breaks and the wrong result it gives. If you cannot name both, or the finding joins two things that do not depend on each other, leave it out.
 - Leave out failures that need the program's own environment to break first: a file that ships with the program fails to load, the disk fills up, memory runs out.
 
 Leave out security issues even when they are also bugs: exposed services or ports, injection, secrets, permissions and auth. A separate security review covers those.
 
-Severity: high when wrong behavior or data loss is likely, medium when it breaks in a realistic case, low for a small but real risk. At most 7 findings, most severe first. When several lines share one cause, report it once.
+Severity: high when wrong behavior or data loss is likely, medium when it breaks in a realistic case, low for a small but real risk. At most 7 findings, most severe first. When several lines share one cause, report it once. Different causes are separate findings.
 
 ## Output
 
